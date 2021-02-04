@@ -7,7 +7,12 @@ defmodule RelativeTime.MixProject do
       version: "0.1.0",
       elixir: "~> 1.11",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      description: "DSL to express absolute and relative times, similar to grafana",
+      package: [
+        licenses: ["MIT"],
+        links: %{"GitHub" => "https://github.com/ZennerIoT/relative_time"}
+      ]
     ]
   end
 
@@ -21,7 +26,8 @@ defmodule RelativeTime.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:timex, "~> 3.6"}
+      {:timex, "~> 3.6"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 end

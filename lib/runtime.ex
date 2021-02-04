@@ -8,11 +8,19 @@ defmodule RelativeTime.Runtime do
          {:ok, ast} <- :relative_time_parser.parse(tokens) do
       {:ok, ast}
     else
-      {:error, {line, :relative_time_parser, text}} ->
+      {:error, {line, :relative_time_parser, [msg, token] = text}} ->
         formatted =
           :relative_time_parser.format_error(text)
           |> :erlang.iolist_to_binary()
-        {:error, "while parsing line #{line}: #{formatted}"}
+
+        token = :erlang.iolist_to_binary(token)
+        with {:ok, parsed_token} <- :erl_eval.eval_str(token <> ".\n") do
+          ctx = elem(parsed_token, 2)
+          make_error(formatted, ctx)
+        else
+          _ ->
+            make_error("while parsing line #{line}: #{formatted}", line: line)
+        end
     end
   end
 
@@ -39,14 +47,14 @@ defmodule RelativeTime.Runtime do
     end
   end
 
-  def eval({:marker, _, [name]}, context) do
+  def eval({:marker, ctx, [name]}, context) do
     markers = Keyword.get(context, :markers, [now: DateTime.utc_now()])
     case Enum.find(markers, fn {key, _value} ->
       to_string(key) == to_string(name)
     end) do
-      nil -> {:error, {:marker_not_found, name}}
+      nil -> make_error("marker not found: #{name}", ctx)
       {_, %DateTime{} = dt} -> {:ok, dt}
-      {key, other} -> {:error, {:invalid_marker, key, other}}
+      {key, other} -> make_error("invalid marker: #{key}=#{inspect other}", ctx)
     end
   end
 
@@ -74,8 +82,8 @@ defmodule RelativeTime.Runtime do
     {:ok, dt}
   end
 
-  def eval(ast, _context) do
-    {:error, :invalid_call, ast}
+  def eval({fun, ctx, args}, _context) do
+    make_error("invalid call to #{fun}/#{length(args)}", ctx)
   end
 
   @spec timex_result({:error, any} | {:ok, any} | any, Macro.t()) :: {:ok, any} | {:error, any, Macro.t()}
@@ -96,5 +104,10 @@ defmodule RelativeTime.Runtime do
 
   def extract_token_from_list(opts) do
     Enum.map(opts, fn {key, {_token, _line, value}} -> {key, value} end)
+  end
+
+  def make_error(msg, ctx) do
+    as_text = [RelativeTime.Tokenizer.render_pos(ctx), msg]
+    {:error, [context: ctx, msg: msg, formatted: as_text]}
   end
 end
