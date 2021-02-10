@@ -27,8 +27,10 @@ defmodule RelativeTime.Runtime do
   @spec eval(Macro.t(), RelativeTime.options) :: {:ok, any()} | {:error, any()}
   def eval({:/, _, [datetime, unit]} = ast, context) do
     edge = get_edge(context)
+    timezone = Keyword.get(context, :default_timezone, "UTC")
     with {:ok, datetime} <- eval(datetime, inc(context)),
-         {:ok, unit} <- eval(unit, inc(context)) do
+         {:ok, unit} <- eval(unit, inc(context)),
+         %DateTime{} = datetime <- Timex.Timezone.convert(datetime, timezone) do
       Calculations.trunc(datetime, edge, unit) |> timex_result(ast)
     end
   end
@@ -48,7 +50,7 @@ defmodule RelativeTime.Runtime do
   end
 
   def eval({:marker, ctx, [name]}, context) do
-    markers = Keyword.get(context, :markers, [now: DateTime.utc_now()])
+    markers = Keyword.get(context, :markers, [now: Calculations.now(context)])
     case Enum.find(markers, fn {key, _value} ->
       to_string(key) == to_string(name)
     end) do

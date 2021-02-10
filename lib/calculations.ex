@@ -89,4 +89,10 @@ defmodule RelativeTime.Calculations do
       end
     end)
   end
+
+  def now(context) do
+    tz = Keyword.get(context, :default_timezone, "UTC")
+    DateTime.utc_now()
+    |> Timex.Timezone.convert(tz)
+  end
 end

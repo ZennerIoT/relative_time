@@ -13,7 +13,7 @@ defmodule RelativeTimeTest do
   test "markers" do
     import RelativeTime
     assert {:ok, %DateTime{}} = from("now")
-    assert {:error, {:marker_not_found, "foo"}} = from("foo")
+    assert {:error, _} = from("foo")
     dt = ~U[2020-01-01T12:30:00Z]
     assert {:ok, ^dt} = from("foo", markers: [foo: dt])
   end
@@ -66,6 +66,12 @@ defmodule RelativeTimeTest do
     assert {:ok, ~U[2020-12-01T00:00:00.000000Z]} = from("2020-12")
     assert {:ok, ~U[2020-12-31T23:59:59.999999Z]} = to("2020-12")
     assert {:ok, ~U[2020-12-13T00:00:00.000000Z]} = from("2020-12-13")
+  end
+
+  test "truncated now respects timezone" do
+    import RelativeTime
+    assert {:ok, res} = from("now/d", markers: [now: @origin], default_timezone: "Europe/Berlin")
+    assert DateTime.compare(~U[2019-12-31T23:00:00Z], res) == :eq
   end
 
   test "parser" do
