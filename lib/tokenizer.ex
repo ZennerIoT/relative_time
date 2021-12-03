@@ -63,12 +63,12 @@ defmodule RelativeTime.Tokenizer do
       {~r/^[0-9]+/, fn [chars | _], rest, ctx, acc ->
         tokenize(rest, inc_col(chars, ctx), [token(:number, ctx, String.to_integer(chars)) | acc])
       end},
+      {~r/^[a-z][a-z0-9\_]+/, fn [word | _], rest, ctx, acc ->
+        tokenize(rest, inc_col(word, ctx), [token(:word, ctx, word) | acc])
+      end},
       {~r/^[smhdwMy][^a-zA-Z]?/, fn [<< char::binary-1, other::binary>> | _], rest, ctx, acc ->
         tokenize(other <> rest, inc_col(1, ctx), [token(:unit, ctx, char) | acc])
       end},
-      {~r/^[a-z][a-z0-9\_]*/, fn [word | _], rest, ctx, acc ->
-        tokenize(rest, inc_col(word, ctx), [token(:word, ctx, word) | acc])
-      end}
     ]
     error = make_error("unknown token", other, ctx)
     Enum.reduce_while(rules, error, fn {rule, fun}, error ->

@@ -79,4 +79,10 @@ defmodule RelativeTimeTest do
     assert {:ok, _} = parse("now-5m/m")
     assert {:error, _} = parse("5m + 1w")
   end
+
+  test "markers that start like a unit" do
+    import RelativeTime.Runtime, only: [parse: 1]
+
+    assert {:ok, _} = parse("start/d")
+  end
 end
