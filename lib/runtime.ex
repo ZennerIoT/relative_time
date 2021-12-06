@@ -8,12 +8,16 @@ defmodule RelativeTime.Runtime do
          {:ok, ast} <- :relative_time_parser.parse(tokens) do
       {:ok, ast}
     else
+      {:error, list} when is_list(list) ->
+        {:error, list}
+
       {:error, {line, :relative_time_parser, [msg, token] = text}} ->
         formatted =
           :relative_time_parser.format_error(text)
           |> :erlang.iolist_to_binary()
 
         token = :erlang.iolist_to_binary(token)
+
         with {:ok, parsed_token} <- :erl_eval.eval_str(token <> ".\n") do
           ctx = elem(parsed_token, 2)
           make_error(formatted, ctx)
@@ -24,10 +28,11 @@ defmodule RelativeTime.Runtime do
     end
   end
 
-  @spec eval(Macro.t(), RelativeTime.options) :: {:ok, any()} | {:error, any()}
+  @spec eval(Macro.t(), RelativeTime.options()) :: {:ok, any()} | {:error, any()}
   def eval({:/, _, [datetime, unit]} = ast, context) do
     edge = get_edge(context)
     timezone = Keyword.get(context, :default_timezone, "UTC")
+
     with {:ok, datetime} <- eval(datetime, inc(context)),
          {:ok, unit} <- eval(unit, inc(context)),
          %DateTime{} = datetime <- Timex.Timezone.convert(datetime, timezone) do
@@ -50,13 +55,14 @@ defmodule RelativeTime.Runtime do
   end
 
   def eval({:marker, ctx, [name]}, context) do
-    markers = Keyword.get(context, :markers, [now: Calculations.now(context)])
+    markers = Keyword.get(context, :markers, now: Calculations.now(context))
+
     case Enum.find(markers, fn {key, _value} ->
-      to_string(key) == to_string(name)
-    end) do
+           to_string(key) == to_string(name)
+         end) do
       nil -> make_error("marker not found: #{name}", ctx)
       {_, %DateTime{} = dt} -> {:ok, dt}
-      {key, other} -> make_error("invalid marker: #{key}=#{inspect other}", ctx)
+      {key, other} -> make_error("invalid marker: #{key}=#{inspect(other)}", ctx)
     end
   end
 
@@ -64,13 +70,15 @@ defmodule RelativeTime.Runtime do
     {:ok, unit}
   end
 
-  def eval({:interval, _, [amount, unit]} = interval, _context) when is_integer(amount) and is_atom(unit) do
+  def eval({:interval, _, [amount, unit]} = interval, _context)
+      when is_integer(amount) and is_atom(unit) do
     {:ok, interval}
   end
 
   def eval({:set_date, _, [opts]}, context) do
     edge = get_edge(context)
     tz = Keyword.get(context, :default_timezone)
+
     with {:ok, now} <- eval({:marker, [], ["now"]}, inc(context)),
          %DateTime{} = now_tz <- Timex.Timezone.convert(now, tz),
          most_precise_unit = Calculations.most_precise_unit(opts),
@@ -88,7 +96,8 @@ defmodule RelativeTime.Runtime do
     make_error("invalid call to #{fun}/#{length(args)}", ctx)
   end
 
-  @spec timex_result({:error, any} | {:ok, any} | any, Macro.t()) :: {:ok, any} | {:error, any, Macro.t()}
+  @spec timex_result({:error, any} | {:ok, any} | any, Macro.t()) ::
+          {:ok, any} | {:error, any, Macro.t()}
   defp timex_result({:error, error}, ast), do: {:error, error, ast}
   defp timex_result({:ok, value}, _ast), do: {:ok, value}
   defp timex_result(value, _ast), do: {:ok, value}
